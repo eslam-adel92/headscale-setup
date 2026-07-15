@@ -1,6 +1,9 @@
 ###############################################################################
 # Headscale — Docker Compose stack.
 # Bring up:  cp .env.example .env && edit .env && docker compose up -d
+#
+# SELinux (Fedora/RHEL): all bind mounts use `:z` for auto-relabelling.
+# Named volumes get labelled automatically.
 ###############################################################################
 
 name: headscale
@@ -168,10 +171,27 @@ services:
       - UI_BASIC_AUTH_USER=${UI_BASIC_AUTH_USER:-admin}
       - UI_BASIC_AUTH_HASH=${UI_BASIC_AUTH_HASH:-}
     volumes:
+      # Both variants mounted; the entrypoint below picks the right one.
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - ./caddy/Caddyfile.auth:/etc/caddy/Caddyfile.auth:ro,z
       - caddy-data:/data
       - caddy-config:/config
-    # Caddy needs CAP_NET_BIND_SERVICE to listen on 80/443 as non-root.
+    # Caddy validates config at parse time, so an empty basic_auth block
+    # fails even if guarded by a request-time matcher. We keep two config
+    # files (with/without auth) and pick at boot based on env.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -n "$${UI_BASIC_AUTH_HASH}" ]; then
+          echo "UI Basic Auth: enabled"
+          CONFIG=/etc/caddy/Caddyfile.auth
+        else
+          echo "UI Basic Auth: disabled (set UI_BASIC_AUTH_HASH to enable)"
+          CONFIG=/etc/caddy/Caddyfile
+        fi
+        exec caddy run --config "$$CONFIG" --adapter caddyfile
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]

@@ -1,10 +1,5 @@
-# Automatic HTTPS via Let's Encrypt.
-#   /web/*  →  headscale-ui:8080   (Basic Auth disabled — see Caddyfile.auth)
-#   /*      →  headscale:8080      (API — always anonymous; clients need it)
-#
-# This variant is loaded when UI_BASIC_AUTH_HASH is empty. To enable UI
-# auth, set UI_BASIC_AUTH_USER/HASH in .env — the caddy container's
-# entrypoint will swap in Caddyfile.auth instead.
+# Same as Caddyfile but with Basic Auth on /web*.
+# Loaded when UI_BASIC_AUTH_HASH is non-empty in .env.
 
 {
     email {$ACME_EMAIL}
@@ -22,6 +17,9 @@
     }
 
     handle /web* {
+        basic_auth {
+            {$UI_BASIC_AUTH_USER} {$UI_BASIC_AUTH_HASH}
+        }
         reverse_proxy headscale-ui:8080
     }
 
