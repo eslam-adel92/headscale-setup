@@ -34,7 +34,7 @@ ui:
   enabled: true              # or false
   image:
     repository: ghcr.io/eslam-adel92/headscale-ui
-    tag: "2026-03-17"
+    tag: "2026.03.17"
 ```
 
 When disabled, the chart skips the UI Deployment, Service, NetworkPolicy, Ingress, and Basic-Auth Secret.
@@ -64,7 +64,7 @@ Headscale-ui pins to specific headscale minor versions — check the compatibili
 
 Current alignment in this chart:
 - headscale `0.29.1`
-- headscale-ui `2026-03-17`
+- headscale-ui `2026.03.17`
 
 ## Custom images vs. upstream
 

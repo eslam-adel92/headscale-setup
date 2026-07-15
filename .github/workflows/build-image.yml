@@ -2,6 +2,17 @@
 # Build → Trivy scan → push BOTH images to GitHub Container Registry.
 #   • headscale     from ./docker    → ghcr.io/<owner>/headscale
 #   • headscale-ui  from ./docker/ui → ghcr.io/<owner>/headscale-ui
+#
+# Trivy action pinned to v0.36.0 by commit SHA (Mar 2026 supply-chain hardening).
+# CodeQL action on v4 (v3 deprecates in Dec 2026).
+#
+# Notes:
+#   - Node 20 deprecation warning is emitted by docker/* actions; harmless.
+#     Will clear when those actions publish Node 24 majors.
+#   - SARIF upload requires `security-events: write` AND `actions: read`.
+#     On PRIVATE repos it also requires GitHub Advanced Security to be
+#     enabled — the step is set to continue-on-error so a missing licence
+#     doesn't fail the whole run. The SARIF is always kept as an artifact.
 ###############################################################################
 
 name: build-image
@@ -14,9 +25,9 @@ on:
         required: true
         default: "0.29.1"
       headscale_ui_version:
-        description: "Headscale-UI upstream version (e.g. 2026-03-17)"
+        description: "Headscale-UI upstream version (e.g. 2026.03.17)"
         required: true
-        default: "2026-03-17"
+        default: "2026.03.17"
       push:
         description: "Push to GHCR after scan passes?"
         type: boolean
@@ -37,6 +48,7 @@ on:
 
 permissions:
   contents: read
+  actions: read           # ← required by codeql-action for workflow-runs API
   packages: write
   security-events: write
   id-token: write
@@ -49,29 +61,21 @@ env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
   DEFAULT_HEADSCALE_VERSION: "0.29.1"
-  DEFAULT_HEADSCALE_UI_VERSION: "2026-03-17"
+  DEFAULT_HEADSCALE_UI_VERSION: "2026.03.17"
 
 jobs:
   build-scan:
     name: Build & Trivy scan (${{ matrix.component.name }})
     runs-on: ubuntu-latest
     outputs:
-      hs_version: ${{ steps.versions.outputs.hs }}
+      hs_version:    ${{ steps.versions.outputs.hs }}
       hs_ui_version: ${{ steps.versions.outputs.hs_ui }}
     strategy:
       fail-fast: false
       matrix:
         component:
-          - {
-              name: headscale,
-              context: ./docker,
-              build_arg_name: HEADSCALE_VERSION,
-            }
-          - {
-              name: headscale-ui,
-              context: ./docker/ui,
-              build_arg_name: HEADSCALE_UI_VERSION,
-            }
+          - { name: headscale,    context: ./docker,    build_arg_name: HEADSCALE_VERSION }
+          - { name: headscale-ui, context: ./docker/ui, build_arg_name: HEADSCALE_UI_VERSION }
     steps:
       - uses: actions/checkout@v4
 
@@ -109,12 +113,13 @@ jobs:
           build-args: ${{ matrix.component.build_arg_name }}=${{ steps.pick.outputs.value }}
           tags: local/${{ matrix.component.name }}:scan
           cache-from: type=gha,scope=${{ matrix.component.name }}-amd64
-          cache-to: type=gha,scope=${{ matrix.component.name }}-amd64,mode=max
+          cache-to:   type=gha,scope=${{ matrix.component.name }}-amd64,mode=max
           provenance: false
 
       - name: Trivy scan (gating)
         id: trivy
-        uses: aquasecurity/trivy-action@v0.36.0
+        # v0.36.0 — pinned by commit SHA for supply-chain safety.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/${{ matrix.component.name }}:scan
           format: table
@@ -129,7 +134,7 @@ jobs:
 
       - name: Trivy SARIF
         if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/${{ matrix.component.name }}:scan
           format: sarif
@@ -143,8 +148,12 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload SARIF to GitHub Security
+        # continue-on-error so a missing GHAS licence on private repos
+        # doesn't fail the whole workflow — the artifact upload below is
+        # the durable fallback either way.
+        continue-on-error: true
         if: always() && hashFiles(format('trivy-{0}.sarif', matrix.component.name)) != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.component.name }}.sarif
           category: trivy-${{ matrix.component.name }}
@@ -169,16 +178,8 @@ jobs:
       fail-fast: false
       matrix:
         component:
-          - {
-              name: headscale,
-              context: ./docker,
-              build_arg_name: HEADSCALE_VERSION,
-            }
-          - {
-              name: headscale-ui,
-              context: ./docker/ui,
-              build_arg_name: HEADSCALE_UI_VERSION,
-            }
+          - { name: headscale,    context: ./docker,    build_arg_name: HEADSCALE_VERSION }
+          - { name: headscale-ui, context: ./docker/ui, build_arg_name: HEADSCALE_UI_VERSION }
     steps:
       - uses: actions/checkout@v4
 

@@ -5,7 +5,7 @@
 ###############################################################################
 
 FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
-ARG HEADSCALE_UI_VERSION=2026-03-17
+ARG HEADSCALE_UI_VERSION=2026.03.17
 ARG VENDOR=eslam-adel92
 
 RUN apk add --no-cache git ca-certificates && update-ca-certificates
@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN npm run build && ls -la build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
-ARG HEADSCALE_UI_VERSION=2026-03-17
+ARG HEADSCALE_UI_VERSION=2026.03.17
 ARG VENDOR=eslam-adel92
 
 LABEL org.opencontainers.image.title="headscale-ui" \

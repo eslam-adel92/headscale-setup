@@ -5,7 +5,7 @@
 IMAGE       ?= ghcr.io/eslam-adel92/headscale
 UI_IMAGE    ?= ghcr.io/eslam-adel92/headscale-ui
 VERSION     ?= 0.29.1
-UI_VERSION  ?= 2026-03-17
+UI_VERSION  ?= 2026.03.17
 PLATFORMS   ?= linux/amd64,linux/arm64
 
 .PHONY: help build build-ui push push-ui scan scan-ui \
