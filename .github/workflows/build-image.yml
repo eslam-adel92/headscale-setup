@@ -56,14 +56,22 @@ jobs:
     name: Build & Trivy scan (${{ matrix.component.name }})
     runs-on: ubuntu-latest
     outputs:
-      hs_version:    ${{ steps.versions.outputs.hs }}
+      hs_version: ${{ steps.versions.outputs.hs }}
       hs_ui_version: ${{ steps.versions.outputs.hs_ui }}
     strategy:
       fail-fast: false
       matrix:
         component:
-          - { name: headscale,    context: ./docker,    build_arg_name: HEADSCALE_VERSION }
-          - { name: headscale-ui, context: ./docker/ui, build_arg_name: HEADSCALE_UI_VERSION }
+          - {
+              name: headscale,
+              context: ./docker,
+              build_arg_name: HEADSCALE_VERSION,
+            }
+          - {
+              name: headscale-ui,
+              context: ./docker/ui,
+              build_arg_name: HEADSCALE_UI_VERSION,
+            }
     steps:
       - uses: actions/checkout@v4
 
@@ -101,12 +109,12 @@ jobs:
           build-args: ${{ matrix.component.build_arg_name }}=${{ steps.pick.outputs.value }}
           tags: local/${{ matrix.component.name }}:scan
           cache-from: type=gha,scope=${{ matrix.component.name }}-amd64
-          cache-to:   type=gha,scope=${{ matrix.component.name }}-amd64,mode=max
+          cache-to: type=gha,scope=${{ matrix.component.name }}-amd64,mode=max
           provenance: false
 
       - name: Trivy scan (gating)
         id: trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/${{ matrix.component.name }}:scan
           format: table
@@ -121,7 +129,7 @@ jobs:
 
       - name: Trivy SARIF
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/${{ matrix.component.name }}:scan
           format: sarif
@@ -161,8 +169,16 @@ jobs:
       fail-fast: false
       matrix:
         component:
-          - { name: headscale,    context: ./docker,    build_arg_name: HEADSCALE_VERSION }
-          - { name: headscale-ui, context: ./docker/ui, build_arg_name: HEADSCALE_UI_VERSION }
+          - {
+              name: headscale,
+              context: ./docker,
+              build_arg_name: HEADSCALE_VERSION,
+            }
+          - {
+              name: headscale-ui,
+              context: ./docker/ui,
+              build_arg_name: HEADSCALE_UI_VERSION,
+            }
     steps:
       - uses: actions/checkout@v4
 
