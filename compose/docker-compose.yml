@@ -6,17 +6,36 @@
 name: headscale
 
 x-restart-policy: &restart unless-stopped
-x-security: &security
+
+# Default security profile — dropped ALL caps.
+# Used by headscale, headscale-ui, caddy — none of them need any caps.
+x-security-strict: &security-strict
   security_opt:
     - no-new-privileges:true
   cap_drop: [ALL]
+
+# Postgres profile — drops ALL by default but re-adds the three caps its
+# entrypoint script needs at startup (chown/chmod PGDATA and /var/run/postgresql
+# before dropping to UID 70). Without these you get:
+#   chmod: /var/run/postgresql: Operation not permitted
+#   chown: /var/lib/postgresql/data/pgdata: Operation not permitted
+x-security-postgres: &security-postgres
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  cap_add:
+    - CHOWN            # chown PGDATA to postgres:postgres
+    - FOWNER           # relax perms on files postgres already owns
+    - DAC_OVERRIDE     # write into dirs the entrypoint doesn't own yet
+    - SETGID           # su-exec / gosu drops root → postgres
+    - SETUID
 
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     restart: *restart
     container_name: headscale-postgres
-    <<: *security
+    <<: *security-postgres
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-headscale}
       - POSTGRES_USER=${POSTGRES_USER:-headscale}
@@ -26,9 +45,9 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ./postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,z
+      - ./postgres/initdb.d:/docker-entrypoint-initdb.d:ro,z
     command:
       - postgres
       - -c
@@ -54,7 +73,9 @@ services:
     container_name: headscale-postgres-backup
     depends_on:
       postgres: { condition: service_healthy }
-    <<: *security
+    # Backup container also runs as the postgres entrypoint's user context,
+    # give it the same profile for consistency (though it doesn't init a PGDATA).
+    <<: *security-postgres
     environment:
       - PGHOST=postgres
       - PGUSER=${POSTGRES_USER:-headscale}
@@ -79,7 +100,7 @@ services:
     networks: [headscale-net]
 
   headscale:
-    image: ${HEADSCALE_IMAGE:-ghcr.io/eslam-adel92/headscale:0.29.2}
+    image: ${HEADSCALE_IMAGE:-ghcr.io/your-org/headscale:0.29.1}
     restart: *restart
     container_name: headscale
     depends_on:
@@ -87,7 +108,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
-    <<: *security
+    <<: *security-strict
     user: "65532:65532"
     environment:
       - TZ=${TZ:-UTC}
@@ -101,8 +122,8 @@ services:
       - HEADSCALE_DATABASE_POSTGRES_SSL=disable
     volumes:
       - headscale-data:/var/lib/headscale
-      - ./config/config.yaml:/etc/headscale/config.yaml:ro
-      - ./config/policy.hujson:/etc/headscale/policy.hujson:ro
+      - ./config/config.yaml:/etc/headscale/config.yaml:ro,z
+      - ./config/policy.hujson:/etc/headscale/policy.hujson:ro,z
     ports:
       - "3478:3478/udp"
     expose: ["8080", "9090"]
@@ -114,7 +135,7 @@ services:
     networks: [headscale-net]
 
   headscale-ui:
-    image: ${HEADSCALE_UI_IMAGE:-ghcr.io/eslam-adel92/headscale-ui:2026.03.17}
+    image: ${HEADSCALE_UI_IMAGE:-ghcr.io/your-org/headscale-ui:2026.03.17}
     restart: *restart
     container_name: headscale-ui
     depends_on: [headscale]
@@ -123,7 +144,7 @@ services:
       - /var/cache/nginx:size=16m,mode=1777
       - /var/run:size=4m,mode=1777
       - /tmp:size=8m,mode=1777
-    <<: *security
+    <<: *security-strict
     user: "101:101"
     expose: ["8080"]
     healthcheck:
@@ -147,9 +168,15 @@ services:
       - UI_BASIC_AUTH_USER=${UI_BASIC_AUTH_USER:-admin}
       - UI_BASIC_AUTH_HASH=${UI_BASIC_AUTH_HASH:-}
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro,z
       - caddy-data:/data
       - caddy-config:/config
+    # Caddy needs CAP_NET_BIND_SERVICE to listen on 80/443 as non-root.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add:
+      - NET_BIND_SERVICE
     networks: [headscale-net]
 
 networks:
