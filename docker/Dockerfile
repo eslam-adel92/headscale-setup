@@ -3,9 +3,9 @@
 # Headscale — hardened, minimal, multi-arch image built from source.
 # Final image: distroless/static:nonroot (~28 MB, no shell, no libc, UID 65532).
 ###############################################################################
-
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
-ARG HEADSCALE_VERSION=0.29.1
+ARG GO_VERSION=1.26.5
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-alpine AS builder
+ARG HEADSCALE_VERSION=0.29.2
 ARG VENDOR=eslam-adel92
 ARG TARGETOS
 ARG TARGETARCH
@@ -22,14 +22,12 @@ ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build \
-      -ldflags="-s -w \
-        -X github.com/juanfont/headscale/hscontrol/types.Version=${HEADSCALE_VERSION} \
-        -extldflags '-static'" \
+      -ldflags="-s -w -X main.version=${HEADSCALE_VERSION}" \
       -o /out/headscale ./cmd/headscale && \
     /out/headscale version
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
-ARG HEADSCALE_VERSION=0.29.1
+ARG HEADSCALE_VERSION=0.29.2
 ARG VENDOR=eslam-adel92
 
 LABEL org.opencontainers.image.title="headscale" \
