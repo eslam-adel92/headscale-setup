@@ -1,0 +1,101 @@
+###############################################################################
+# .gitignore — headscale-setup
+###############################################################################
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+compose/.env
+compose/.env.*
+!compose/.env.example
+
+# Environment-specific Helm value overrides
+helm/headscale/values-*.yaml
+!helm/headscale/values.yaml
+
+# Rendered manifests
+rendered/
+manifests-*.yaml
+
+# Runtime state
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+noise_private.key
+derp_private.key
+
+# htpasswd files (Basic Auth multi-user)
+auth
+htpasswd
+users.htpasswd
+
+# Backups
+*.dump
+*.sql.gz
+*.bak
+*.backup
+backups/
+db-backup/
+pg-backup/
+
+# Build artifacts
+bin/
+dist/
+build/
+out/
+*.tgz
+*.tar
+*.tar.gz
+
+# UI local build
+docker/ui/build/
+docker/ui/node_modules/
+docker/ui/.svelte-kit/
+
+# CI/scan
+trivy-results.sarif
+trivy-*.sarif
+*.sarif
+
+# Data volumes
+data/
+caddy-data/
+caddy-config/
+postgres-data/
+headscale-data/
+.cache/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# kubeconfig
+kubeconfig
+kubeconfig-*
+.kube/
+
+# Editor / OS
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

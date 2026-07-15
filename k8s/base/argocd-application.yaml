@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: headscale
+  namespace: argocd
+  labels: { application: headscale }
+spec:
+  project: default
+  source:
+    # Point at your fork / mirror of headscale-setup
+    repoURL: https://github.com/your-org/headscale-setup.git
+    targetRevision: main
+    path: helm/headscale
+    helm:
+      releaseName: headscale
+      valueFiles: [values-prod.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: headscale
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 5m }

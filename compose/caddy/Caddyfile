@@ -1,0 +1,38 @@
+# Automatic HTTPS via Let's Encrypt.
+#   /web/*  →  headscale-ui:8080   (optionally protected by basic auth)
+#   /*      →  headscale:8080      (API — always anonymous; clients need it)
+{$HEADSCALE_DOMAIN} {
+    email {$ACME_EMAIL}
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "no-referrer"
+        -Server
+    }
+
+    handle /web* {
+        # If UI_BASIC_AUTH_HASH is empty, Caddy skips Basic Auth entirely.
+        @noauth expression `{env.UI_BASIC_AUTH_HASH} == ""`
+        handle @noauth {
+            reverse_proxy headscale-ui:8080
+        }
+        handle {
+            basic_auth {
+                {$UI_BASIC_AUTH_USER} {$UI_BASIC_AUTH_HASH}
+            }
+            reverse_proxy headscale-ui:8080
+        }
+    }
+
+    handle {
+        reverse_proxy headscale:8080 {
+            header_up Host              {host}
+            header_up X-Real-IP         {remote}
+            header_up X-Forwarded-For   {remote}
+            header_up X-Forwarded-Proto https
+        }
+    }
+}

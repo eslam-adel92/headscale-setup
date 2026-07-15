@@ -1,0 +1,164 @@
+###############################################################################
+# Headscale — Docker Compose stack.
+# Bring up:  cp .env.example .env && edit .env && docker compose up -d
+###############################################################################
+
+name: headscale
+
+x-restart-policy: &restart unless-stopped
+x-security: &security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: *restart
+    container_name: headscale-postgres
+    <<: *security
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-headscale}
+      - POSTGRES_USER=${POSTGRES_USER:-headscale}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set it in .env}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - TZ=${TZ:-UTC}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+    expose: ["5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-headscale} -d ${POSTGRES_DB:-headscale}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [headscale-net]
+    deploy:
+      resources:
+        limits:       { cpus: "${POSTGRES_CPU_LIMIT:-2.0}",  memory: "${POSTGRES_MEM_LIMIT:-1G}" }
+        reservations: { cpus: "${POSTGRES_CPU_REQ:-0.25}",   memory: "${POSTGRES_MEM_REQ:-256M}" }
+
+  postgres-backup:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: *restart
+    container_name: headscale-postgres-backup
+    depends_on:
+      postgres: { condition: service_healthy }
+    <<: *security
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${POSTGRES_USER:-headscale}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=${POSTGRES_DB:-headscale}
+      - BACKUP_INTERVAL=${BACKUP_INTERVAL:-86400}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - postgres-backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        while true; do
+          TS=$$(date -u +%Y%m%dT%H%M%SZ)
+          echo "[$$TS] backing up $$PGDATABASE"
+          pg_dump --format=custom --compress=6 --file=/backups/headscale-$$TS.dump
+          find /backups -name 'headscale-*.dump' -mtime +$${BACKUP_RETENTION_DAYS} -delete
+          sleep $${BACKUP_INTERVAL}
+        done
+    profiles: [backup]
+    networks: [headscale-net]
+
+  headscale:
+    image: ${HEADSCALE_IMAGE:-ghcr.io/your-org/headscale:0.29.1}
+    restart: *restart
+    container_name: headscale
+    depends_on:
+      postgres: { condition: service_healthy }
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    <<: *security
+    user: "65532:65532"
+    environment:
+      - TZ=${TZ:-UTC}
+      - HEADSCALE_SERVER_URL=https://${HEADSCALE_DOMAIN}
+      - HEADSCALE_DATABASE_TYPE=postgres
+      - HEADSCALE_DATABASE_POSTGRES_HOST=postgres
+      - HEADSCALE_DATABASE_POSTGRES_PORT=5432
+      - HEADSCALE_DATABASE_POSTGRES_NAME=${POSTGRES_DB:-headscale}
+      - HEADSCALE_DATABASE_POSTGRES_USER=${POSTGRES_USER:-headscale}
+      - HEADSCALE_DATABASE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - HEADSCALE_DATABASE_POSTGRES_SSL=disable
+    volumes:
+      - headscale-data:/var/lib/headscale
+      - ./config/config.yaml:/etc/headscale/config.yaml:ro
+      - ./config/policy.hujson:/etc/headscale/policy.hujson:ro
+    ports:
+      - "3478:3478/udp"
+    expose: ["8080", "9090"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/headscale", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [headscale-net]
+
+  headscale-ui:
+    image: ${HEADSCALE_UI_IMAGE:-ghcr.io/your-org/headscale-ui:2026-03-17}
+    restart: *restart
+    container_name: headscale-ui
+    depends_on: [headscale]
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=1777
+      - /var/run:size=4m,mode=1777
+      - /tmp:size=8m,mode=1777
+    <<: *security
+    user: "101:101"
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [headscale-net]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: *restart
+    container_name: headscale-caddy
+    depends_on: [headscale, headscale-ui]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - HEADSCALE_DOMAIN=${HEADSCALE_DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - UI_BASIC_AUTH_USER=${UI_BASIC_AUTH_USER:-admin}
+      - UI_BASIC_AUTH_HASH=${UI_BASIC_AUTH_HASH:-}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [headscale-net]
+
+networks:
+  headscale-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  postgres-backups:
+  headscale-data:
+  caddy-data:
+  caddy-config:

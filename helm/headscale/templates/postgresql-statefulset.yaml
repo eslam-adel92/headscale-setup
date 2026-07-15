@@ -1,0 +1,85 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "headscale.postgresql.fullname" . }}
+  labels: {{- include "headscale.postgresql.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "headscale.postgresql.fullname" . }}-headless
+  replicas: 1
+  updateStrategy: { type: RollingUpdate }
+  selector:
+    matchLabels: {{- include "headscale.postgresql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "headscale.postgresql.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/postgresql-configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities: { drop: [ALL] }
+          args:
+            - -c
+            - config_file=/etc/postgresql/postgresql.conf
+            - -c
+            - hba_file=/etc/postgresql/pg_hba.conf
+          env:
+            - { name: POSTGRES_DB,   value: {{ .Values.postgresql.auth.database | quote }} }
+            - { name: POSTGRES_USER, value: {{ .Values.postgresql.auth.username | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "headscale.dbSecretName" . }}
+                  key:  {{ include "headscale.dbSecretKey" . }}
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+            - { name: POSTGRES_INITDB_ARGS, value: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C" }
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          volumeMounts:
+            - { name: data,   mountPath: /var/lib/postgresql/data }
+            - { name: config, mountPath: /etc/postgresql }
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.postgresql.auth.username | quote }}, -d, {{ .Values.postgresql.auth.database | quote }}]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.postgresql.auth.username | quote }}, -d, {{ .Values.postgresql.auth.database | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources: {{- toYaml .Values.postgresql.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "headscale.postgresql.fullname" . }}-config
+        {{- if not .Values.postgresql.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels: {{- include "headscale.postgresql.labels" . | nindent 10 }}
+      spec:
+        accessModes: [{{ .Values.postgresql.persistence.accessMode }}]
+        {{- if .Values.postgresql.persistence.storageClass }}
+        storageClassName: {{ .Values.postgresql.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.postgresql.persistence.size }} }
+  {{- end }}
+{{- end }}

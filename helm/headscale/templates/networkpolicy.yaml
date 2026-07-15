@@ -1,0 +1,43 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "headscale.fullname" . }}
+  labels: {{- include "headscale.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "headscale.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: control-plane
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- include "headscale.netpol.ingressControllerFrom" . | nindent 8 }}
+      ports: [ { port: 8080, protocol: TCP } ]
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoring.namespace }} }
+      ports: [ { port: 9090, protocol: TCP } ]
+    {{- if .Values.derp.embedded }}
+    - from:
+        {{- range .Values.networkPolicy.allowedIngressCIDRs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [ { port: {{ .Values.derp.stunPort }}, protocol: UDP } ]
+    {{- end }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    {{- if eq .Values.database.type "postgres" }}
+    - to:
+        - podSelector:
+            matchLabels: {{- include "headscale.postgresql.selectorLabels" . | nindent 14 }}
+      ports: [ { port: 5432, protocol: TCP } ]
+    {{- end }}
+    - to: [ { ipBlock: { cidr: 0.0.0.0/0 } } ]
+      ports: [ { port: 443, protocol: TCP } ]
+{{- end }}

@@ -1,0 +1,1 @@
+-- Runs ONCE on empty PGDATA. Headscale doesn't require any extensions.

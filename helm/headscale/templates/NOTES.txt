@@ -1,0 +1,44 @@
+🦭 Headscale is deploying.
+
+Release:    {{ .Release.Name }}
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Chart.AppVersion }}
+
+Database:
+{{- if eq .Values.database.type "sqlite" }}
+  Mode:     SQLite (single-node)
+{{- else if .Values.postgresql.external.enabled }}
+  Mode:     External PostgreSQL ({{ .Values.postgresql.external.host }}:{{ .Values.postgresql.external.port }})
+{{- else if .Values.postgresql.enabled }}
+  Mode:     Bundled PostgreSQL ({{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }})
+  Backups:  {{ if .Values.postgresql.backup.enabled }}enabled ({{ .Values.postgresql.backup.schedule }}, {{ .Values.postgresql.backup.retentionDays }}d retention){{ else }}disabled{{ end }}
+{{- end }}
+{{- if .Values.vault.enabled }}
+  Secret:   Vault → {{ .Values.vault.mount }}/{{ .Values.vault.path }} (via VSO)
+{{- end }}
+
+Web UI: {{ if .Values.ui.enabled }}enabled — https://{{ .Values.ingress.host }}/web{{ else }}disabled{{ end }}
+{{- if and .Values.ui.enabled .Values.ui.basicAuth.enabled }}
+  Basic Auth: enabled ({{ include "headscale.uiBasicAuthSecretName" . }})
+{{- end }}
+
+NetworkPolicy — ingress controller {{ if .Values.networkPolicy.ingressController.namespace }}in `{{ .Values.networkPolicy.ingressController.namespace }}`{{ else }}in same namespace (`{{ .Release.Namespace }}`){{ end }}
+
+Next steps:
+  1. kubectl -n {{ .Release.Namespace }} get pods -w
+  2. curl -sSf https://{{ .Values.ingress.host }}/health && echo OK
+  3. ./scripts/hs-add-device <username> --tags tag:laptop
+{{- if .Values.ui.enabled }}
+
+Sign in to the UI:
+  a. Open https://{{ .Values.ingress.host }}/web
+  {{- if .Values.ui.basicAuth.enabled }}
+  b. Enter Basic Auth credentials (username `{{ .Values.ui.basicAuth.username | default "(see existingSecret)" }}`).
+  c. Create an API key and paste into Settings → API key:
+  {{- else }}
+  b. Create an API key and paste into Settings → API key:
+  {{- end }}
+
+     kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "headscale.fullname" . }} -- \
+       headscale apikeys create --expiration 90d
+{{- end }}

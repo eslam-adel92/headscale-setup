@@ -1,0 +1,221 @@
+###############################################################################
+# Default values for the headscale Helm chart.
+# `your-org` and `hs.example.com` are placeholders — override in a
+# values-{env}.yaml (under .gitignore) or via --set at deploy time.
+###############################################################################
+
+image:
+  repository: ghcr.io/your-org/headscale
+  tag: "0.29.1"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# ⚠️  Headscale is single-writer. See docs/SCALING.md before raising replicaCount.
+replicaCount: 1
+
+server:
+  url: https://hs.example.com
+  baseDomain: hs.internal
+
+# ---------- Database --------------------------------------------------------
+database:
+  type: postgres     # postgres | sqlite
+
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  auth:
+    database: headscale
+    username: headscale
+    # Priority: vault → external.existingSecret → auth.existingSecret → auto-gen
+    existingSecret: ""
+    existingSecretKey: password
+
+  # Rendered directly into postgresql.conf. Add/remove freely.
+  config:
+    max_connections: "100"
+    shared_buffers: "256MB"
+    effective_cache_size: "768MB"
+    work_mem: "8MB"
+    maintenance_work_mem: "64MB"
+    wal_level: "replica"
+    max_wal_size: "1GB"
+    min_wal_size: "80MB"
+    checkpoint_timeout: "15min"
+    checkpoint_completion_target: "0.9"
+    random_page_cost: "1.1"
+    effective_io_concurrency: "200"
+    log_min_duration_statement: "250ms"
+    log_lock_waits: "on"
+    log_line_prefix: "'%m [%p] %q%u@%d '"
+    autovacuum: "on"
+
+  clientConfig:
+    maxOpenConns: 25
+    maxIdleConns: 25
+    connMaxIdleTimeSecs: 3600
+    ssl: disable
+
+  persistence:
+    enabled: true
+    storageClass: ""       # empty = cluster default
+    size: 10Gi
+    accessMode: ReadWriteOnce
+
+  resources:
+    requests: { cpu: 250m,  memory: 256Mi }
+    limits:   { cpu: 2000m, memory: 1Gi }
+
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retentionDays: 14
+    storageClass: ""
+    size: 20Gi
+
+  external:
+    enabled: false
+    host: ""
+    port: 5432
+    database: headscale
+    username: headscale
+    existingSecret: ""
+    existingSecretKey: password
+    ssl: require
+
+# ---------- Vault (OPTIONAL) ------------------------------------------------
+# Requires hashicorp/vault-secrets-operator installed on the cluster.
+vault:
+  enabled: false
+  connectionRef: vault-connection
+  authRef: vault-auth
+  mount: kv
+  path: apps/headscale/postgres
+  refreshAfter: 1h
+  destinationSecretName: headscale-vault-db
+
+# ---------- Web UI (headscale-ui) -------------------------------------------
+ui:
+  enabled: true
+  image:
+    repository: ghcr.io/your-org/headscale-ui
+    tag: "2026-03-17"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests: { cpu: 10m,  memory: 32Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Basic Auth on the /web Ingress ONLY. Never on / — Tailscale clients
+  # must reach the API anonymously.
+  basicAuth:
+    enabled: false
+    realm: "headscale-ui"
+    existingSecret: ""
+    # ⚠️  Set at deploy time via --set-string or values-{env}.yaml (gitignored).
+    username: "admin"
+    password: ""
+
+# ---------- DERP ------------------------------------------------------------
+derp:
+  embedded: true
+  regionId: 900
+  regionCode: primary
+  regionName: "Primary DERP"
+  stunPort: 3478
+
+# ---------- Headscale persistence (Noise/DERP keys) -------------------------
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 2Gi
+  accessMode: ReadWriteOnce
+
+# ---------- Ingress + cert-manager ------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    # Adjust to whatever ClusterIssuer you use.
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  host: hs.example.com
+  tls:
+    enabled: true
+    secretName: headscale-tls
+
+# ---------- Sample ACL policy (edit for your org) ---------------------------
+policy:
+  content: |
+    {
+      "groups":    { "group:admins": ["admin"] },
+      "tagOwners": { "tag:server":   ["group:admins"] },
+      "acls":      [ { "action": "accept", "src": ["group:admins"], "dst": ["*:*"] } ]
+    }
+
+resources:
+  requests: { cpu: 100m,  memory: 128Mi }
+  limits:   { cpu: 1000m, memory: 512Mi }
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  capabilities:
+    drop: [ALL]
+
+# ---------- NetworkPolicy ---------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Ingress controller location.
+  # Empty namespace = same namespace as release (pod-only selector).
+  ingressController:
+    namespace: ""
+    podLabels:
+      app.kubernetes.io/name: ingress-nginx
+  monitoring:
+    namespace: monitoring
+  allowedIngressCIDRs:
+    - 0.0.0.0/0
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    labels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraEnv: []

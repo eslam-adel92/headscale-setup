@@ -1,0 +1,9 @@
+**/.git
+**/.github
+**/*.md
+**/.env
+**/*.sqlite
+**/*.sqlite-*
+**/data
+**/dist
+**/node_modules

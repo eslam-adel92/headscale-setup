@@ -1,0 +1,17 @@
+apiVersion: v2
+name: headscale
+description: |
+  Self-hosted Tailscale coordination server — hardened, minimal, ArgoCD-ready.
+  Optional bundled PostgreSQL 16, Vault-Secrets-Operator integration,
+  headscale-ui with optional Basic Auth ingress.
+type: application
+version: 0.4.0
+appVersion: "0.29.1"
+kubeVersion: ">=1.27.0-0"
+home: https://headscale.net
+sources:
+  - https://github.com/juanfont/headscale
+  - https://github.com/gurucomputing/headscale-ui
+icon: https://headscale.net/stable/logo.png
+annotations:
+  category: Networking

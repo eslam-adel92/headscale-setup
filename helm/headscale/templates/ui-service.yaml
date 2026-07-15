@@ -1,0 +1,16 @@
+{{- if .Values.ui.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "headscale.fullname" . }}-ui
+  labels:
+    {{- include "headscale.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "headscale.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+{{- end }}

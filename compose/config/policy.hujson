@@ -1,0 +1,21 @@
+// Headscale ACL policy (HuJSON). Default: deny-all → whitelist per group/tag.
+// Adjust user names to match your headscale users.
+{
+  "groups": {
+    "group:admins":  ["admin"],
+    "group:users":   ["alice", "bob"]
+  },
+  "tagOwners": {
+    "tag:server":  ["group:admins"],
+    "tag:ci":      ["group:admins"],
+    "tag:laptop":  ["group:users"]
+  },
+  "acls": [
+    { "action": "accept", "src": ["group:admins"], "dst": ["*:*"] },
+    { "action": "accept", "src": ["group:users"],  "dst": ["tag:server:22,80,443,5432,6443"] },
+    { "action": "accept", "src": ["tag:ci"],       "dst": ["tag:server:22"] }
+  ],
+  "ssh": [
+    { "action": "check", "src": ["group:admins"], "dst": ["tag:server"], "users": ["autogroup:nonroot", "root"] }
+  ]
+}

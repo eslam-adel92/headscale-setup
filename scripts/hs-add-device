@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+###############################################################################
+# hs-add-device — one-command device onboarding.
+# Usage: ./hs-add-device <username> [--reusable] [--ephemeral] [--ttl 24h] [--tags tag:laptop]
+# Auto-detects Docker Compose / Kubernetes / local binary.
+###############################################################################
+set -euo pipefail
+
+USER="${1:-}"; shift || true
+REUSABLE="false"; EPHEMERAL="false"; TTL="24h"; TAGS=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --reusable)  REUSABLE="true"; shift ;;
+    --ephemeral) EPHEMERAL="true"; shift ;;
+    --ttl)       TTL="$2"; shift 2 ;;
+    --tags)      TAGS="$2"; shift 2 ;;
+    *) echo "Unknown flag: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$USER" ]] && { echo "Usage: $0 <username> [--reusable] [--ephemeral] [--ttl 24h] [--tags tag:laptop]" >&2; exit 2; }
+
+run_hs() {
+  if [[ -n "${HS_BIN:-}" ]]; then
+    "$HS_BIN" "$@"
+  elif command -v kubectl >/dev/null && kubectl get pods -n "${HS_KUBE_NS:-headscale}" -l app.kubernetes.io/name=headscale,app.kubernetes.io/component=control-plane -o name 2>/dev/null | grep -q .; then
+    POD=$(kubectl get pods -n "${HS_KUBE_NS:-headscale}" -l app.kubernetes.io/name=headscale,app.kubernetes.io/component=control-plane -o jsonpath='{.items[0].metadata.name}')
+    kubectl exec -n "${HS_KUBE_NS:-headscale}" "$POD" -- headscale "$@"
+  elif docker compose ps headscale --quiet >/dev/null 2>&1; then
+    docker compose exec -T headscale headscale "$@"
+  else
+    echo "❌ Could not detect a running headscale (binary / compose / k8s)." >&2
+    exit 1
+  fi
+}
+
+SERVER_URL="${HEADSCALE_DOMAIN:+https://$HEADSCALE_DOMAIN}"
+if [[ -z "$SERVER_URL" ]]; then
+  SERVER_URL=$(run_hs configtest 2>/dev/null | awk -F': ' '/server_url/ {print $2; exit}' || true)
+fi
+: "${SERVER_URL:?Set HEADSCALE_DOMAIN or configure server_url}"
+
+if ! run_hs users list --output json | grep -q "\"name\":\"${USER}\""; then
+  echo "→ Creating headscale user: $USER"
+  run_hs users create "$USER" >/dev/null
+fi
+
+FLAGS=(--user "$USER" --expiration "$TTL")
+[[ "$REUSABLE"  == "true" ]] && FLAGS+=(--reusable)
+[[ "$EPHEMERAL" == "true" ]] && FLAGS+=(--ephemeral)
+[[ -n "$TAGS" ]]              && FLAGS+=(--tags "$TAGS")
+
+KEY=$(run_hs preauthkeys create "${FLAGS[@]}" --output json | sed -E 's/.*"key":"([^"]+)".*/\1/')
+
+CMD="tailscale up --login-server ${SERVER_URL} --authkey ${KEY}"
+IOS_URL="tailscale://login-server=${SERVER_URL}&authkey=${KEY}"
+
+cat <<EOF
+
+╭──────────────────────────────────────────────────────────────────────╮
+│  ✅ Device onboarding token ready for user: ${USER}
+│  Expires in: ${TTL}
+╰──────────────────────────────────────────────────────────────────────╯
+
+▸ Linux / macOS / Windows:
+    ${CMD}
+
+▸ iOS / Android — scan QR (needs \`qrencode\`):
+EOF
+
+if command -v qrencode >/dev/null 2>&1; then
+  qrencode -t ANSIUTF8 "$IOS_URL"
+else
+  echo "   (install \`qrencode\` for inline QR; or open on phone:)"
+  echo "   $IOS_URL"
+fi
+
+cat <<EOF
+
+▸ Deep-link: ${IOS_URL}
+▸ Web UI:    ${SERVER_URL}/web
+
+EOF

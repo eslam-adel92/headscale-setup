@@ -1,0 +1,22 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "headscale.postgresql.fullname" . }}-config
+  labels: {{- include "headscale.postgresql.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |
+{{- range $k, $v := .Values.postgresql.config }}
+    {{ $k }} = {{ $v }}
+{{- end }}
+    listen_addresses = '*'
+    port = 5432
+  pg_hba.conf: |
+    local   all       all                    trust
+    host    all       all   127.0.0.1/32     scram-sha-256
+    host    all       all   ::1/128          scram-sha-256
+    host    all       all   10.0.0.0/8       scram-sha-256
+    host    all       all   172.16.0.0/12    scram-sha-256
+    host    all       all   192.168.0.0/16   scram-sha-256
+    host    all       all   0.0.0.0/0        reject
+{{- end }}
