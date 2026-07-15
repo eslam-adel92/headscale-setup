@@ -6,13 +6,14 @@
 # Trivy action pinned to v0.36.0 by commit SHA (Mar 2026 supply-chain hardening).
 # CodeQL action on v4 (v3 deprecates in Dec 2026).
 #
-# Notes:
-#   - Node 20 deprecation warning is emitted by docker/* actions; harmless.
-#     Will clear when those actions publish Node 24 majors.
-#   - SARIF upload requires `security-events: write` AND `actions: read`.
-#     On PRIVATE repos it also requires GitHub Advanced Security to be
-#     enabled — the step is set to continue-on-error so a missing licence
-#     doesn't fail the whole run. The SARIF is always kept as an artifact.
+# SARIF upload to GitHub Code Scanning is OPTIONAL and controlled by a
+# repository variable:
+#   Repo → Settings → Secrets and variables → Actions → Variables tab
+#   → New repository variable  →  Name: ENABLE_SARIF_UPLOAD  Value: true
+#
+# When unset or "false" the workflow skips the upload step and only keeps
+# the SARIF as a downloadable artifact (30-day retention). Enable it once
+# you've turned on Code Scanning in Settings → Code security.
 ###############################################################################
 
 name: build-image
@@ -48,9 +49,9 @@ on:
 
 permissions:
   contents: read
-  actions: read           # ← required by codeql-action for workflow-runs API
+  actions: read           # codeql-action needs this for the workflow-runs API
   packages: write
-  security-events: write
+  security-events: write  # only used when ENABLE_SARIF_UPLOAD == "true"
   id-token: write
 
 concurrency:
@@ -147,12 +148,16 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload SARIF to GitHub Security
-        # continue-on-error so a missing GHAS licence on private repos
-        # doesn't fail the whole workflow — the artifact upload below is
-        # the durable fallback either way.
+      - name: Upload SARIF to GitHub Code Scanning
+        # Runs only when the repo variable ENABLE_SARIF_UPLOAD is set to
+        # "true" AND the SARIF file was produced. On personal repos where
+        # Code Scanning isn't enabled, leave the variable unset and the
+        # SARIF ships as an artifact instead.
+        if: |
+          always() &&
+          vars.ENABLE_SARIF_UPLOAD == 'true' &&
+          hashFiles(format('trivy-{0}.sarif', matrix.component.name)) != ''
         continue-on-error: true
-        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.component.name)) != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.component.name }}.sarif
