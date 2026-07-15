@@ -2,6 +2,11 @@
 ###############################################################################
 # Headscale — hardened, minimal, multi-arch image built from source.
 # Final image: distroless/static:nonroot (~28 MB, no shell, no libc, UID 65532).
+#
+# Notes:
+#   • ldflags "-X main.version=..."   (upstream injects version via main.version)
+#   • CGO_ENABLED=0                    (headscale uses pure-Go modernc.org/sqlite)
+#   • Go 1.25 minimum for 0.29.x       (main branch is on 1.26)
 ###############################################################################
 ARG GO_VERSION=1.26.5
 FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-alpine AS builder
@@ -10,7 +15,12 @@ ARG VENDOR=eslam-adel92
 ARG TARGETOS
 ARG TARGETARCH
 
-RUN apk add --no-cache git ca-certificates tzdata && update-ca-certificates
+# Patch Alpine packages in the builder. Doesn't affect the final image
+# (distroless has no libs), but keeps intermediate caches CVE-clean.
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache git ca-certificates tzdata && \
+    update-ca-certificates && \
+    rm -rf /var/cache/apk/*
 
 WORKDIR /src
 RUN git clone --depth 1 --branch v${HEADSCALE_VERSION} \
@@ -23,9 +33,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build \
       -ldflags="-s -w -X main.version=${HEADSCALE_VERSION}" \
-      -o /out/headscale ./cmd/headscale && \
+      -o /out/headscale \
+      ./cmd/headscale && \
     /out/headscale version
 
+# ---- 2. Runtime stage ------------------------------------------------------
+# distroless/static rebuilds nightly against the newest sub-image, so we
+# don't need an apk upgrade layer here — nothing to upgrade.
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 ARG HEADSCALE_VERSION=0.29.2
 ARG VENDOR=eslam-adel92
