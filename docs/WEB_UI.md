@@ -33,7 +33,7 @@ One switch:
 ui:
   enabled: true              # or false
   image:
-    repository: ghcr.io/your-org/headscale-ui
+    repository: ghcr.io/eslam-adel92/headscale-ui
     tag: "2026-03-17"
 ```
 

@@ -8,7 +8,7 @@ spec:
   project: default
   source:
     # Point at your fork / mirror of headscale-setup
-    repoURL: https://github.com/your-org/headscale-setup.git
+    repoURL: https://github.com/eslam-adel92/headscale-setup.git
     targetRevision: main
     path: helm/headscale
     helm:

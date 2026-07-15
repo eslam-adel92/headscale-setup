@@ -6,7 +6,7 @@
 
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 ARG HEADSCALE_VERSION=0.29.1
-ARG VENDOR=headscale-setup
+ARG VENDOR=eslam-adel92
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 ARG HEADSCALE_VERSION=0.29.1
-ARG VENDOR=headscale-setup
+ARG VENDOR=eslam-adel92
 
 LABEL org.opencontainers.image.title="headscale" \
       org.opencontainers.image.description="Self-hosted Tailscale control server — hardened build" \

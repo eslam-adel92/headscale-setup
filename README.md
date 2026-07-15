@@ -6,7 +6,7 @@
 
 Runs anywhere from a laptop (`docker compose up`) to a Kubernetes cluster
 (Helm chart with 22 templates, ArgoCD-ready). Nothing is tied to any specific
-organisation — swap `your-org` in a couple of places and go.
+organisation — swap `eslam-adel92` in a couple of places and go.
 
 ## Table of contents
 
@@ -99,16 +99,16 @@ hardcoded to any specific environment.
 
 | Placeholder | Where | Replace with |
 |---|---|---|
-| `your-org` | `helm/headscale/values.yaml`, `compose/.env.example`, `Makefile`, `k8s/base/argocd-application.yaml` | Your GitHub org / GHCR namespace |
+| `eslam-adel92` | `helm/headscale/values.yaml`, `compose/.env.example`, `Makefile`, `k8s/base/argocd-application.yaml` | Your GitHub org / GHCR namespace |
 | `hs.example.com` | `helm/headscale/values.yaml`, `compose/.env.example` | Your public FQDN for headscale |
 | `admin@example.com` | `compose/.env.example` | Let's Encrypt registration email |
 | `hs.internal` | `helm/headscale/values.yaml`, `compose/config/config.yaml`, `docker/config/config.yaml` | Your MagicDNS base domain (any private domain) |
 | `letsencrypt` | `helm/headscale/values.yaml → ingress.annotations` | Your cert-manager `ClusterIssuer` name |
-| `https://github.com/your-org/headscale-setup.git` | `k8s/base/argocd-application.yaml` | Your fork URL |
+| `https://github.com/eslam-adel92/headscale-setup.git` | `k8s/base/argocd-application.yaml` | Your fork URL |
 
 Quick bulk-replace (Linux/macOS):
 ```bash
-grep -rl "your-org"        . | xargs sed -i 's/your-org/my-real-org/g'
+grep -rl "eslam-adel92"        . | xargs sed -i 's/eslam-adel92/my-real-org/g'
 grep -rl "hs.example.com"  . | xargs sed -i 's/hs.example.com/hs.yourdomain.com/g'
 grep -rl "admin@example.com" . | xargs sed -i 's/admin@example.com/ops@yourdomain.com/g'
 ```
@@ -123,8 +123,8 @@ timezone (`UTC`), DB name/user (`headscale`), Vault path (`apps/headscale/postgr
 
 ```bash
 # 1. Build both images (or pull from GHCR once CI has run)
-docker buildx build -t ghcr.io/your-org/headscale:0.29.1        docker/
-docker buildx build -t ghcr.io/your-org/headscale-ui:2026-03-17 docker/ui/
+docker buildx build -t ghcr.io/eslam-adel92/headscale:0.29.1        docker/
+docker buildx build -t ghcr.io/eslam-adel92/headscale-ui:2026-03-17 docker/ui/
 
 # 2. Configure
 cp compose/.env.example compose/.env
@@ -158,8 +158,8 @@ helm template headscale helm/headscale -f helm/headscale/values.yaml
 helm upgrade --install headscale ./helm/headscale \
   --namespace headscale --create-namespace \
   -f helm/headscale/values.yaml \
-  --set image.repository=ghcr.io/your-org/headscale \
-  --set ui.image.repository=ghcr.io/your-org/headscale-ui \
+  --set image.repository=ghcr.io/eslam-adel92/headscale \
+  --set ui.image.repository=ghcr.io/eslam-adel92/headscale-ui \
   --set server.url=https://hs.yourdomain.com \
   --set ingress.host=hs.yourdomain.com \
   --set ui.basicAuth.enabled=true \
@@ -195,8 +195,8 @@ push to `main` touching `docker/**`, and tag `v*.*.*` (semver-tagged release).
 **Auth**: uses the built-in `GITHUB_TOKEN` — no PAT needed. Least-privilege scoping via the workflow's `permissions:` block (`packages: write`, `security-events: write`, `id-token: write`).
 
 Images land at:
-- `ghcr.io/<your-org>/headscale:0.29.1` (+ `latest`, `sha-abcdef1`, semver tags on git tags)
-- `ghcr.io/<your-org>/headscale-ui:2026-03-17` (same tag policy)
+- `ghcr.io/<eslam-adel92>/headscale:0.29.1` (+ `latest`, `sha-abcdef1`, semver tags on git tags)
+- `ghcr.io/<eslam-adel92>/headscale-ui:2026-03-17` (same tag policy)
 
 ---
 

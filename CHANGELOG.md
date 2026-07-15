@@ -42,7 +42,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - Project renamed from `headscale-unifonic` to `headscale-setup`.
 - All references to specific orgs, domains, users, timezones replaced with
-  generic placeholders: `your-org`, `hs.example.com`, `admin@example.com`,
+  generic placeholders: `eslam-adel92`, `hs.example.com`, `admin@example.com`,
   `admin`/`alice`/`bob`, `UTC`, `primary` (DERP region).
 - Image labels use a `VENDOR` build arg (default `headscale-setup`).
 - CI workflow uses `${{ github.repository_owner }}` for the org so
@@ -119,11 +119,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Windows, iOS, Android.
 - Initial docs: `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/SCALING.md`.
 
-[Unreleased]: https://github.com/your-org/headscale-setup/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/your-org/headscale-setup/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/your-org/headscale-setup/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/your-org/headscale-setup/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/your-org/headscale-setup/compare/v0.0.3...v0.1.0
-[0.0.3]: https://github.com/your-org/headscale-setup/compare/v0.0.2...v0.0.3
-[0.0.2]: https://github.com/your-org/headscale-setup/compare/v0.0.1...v0.0.2
-[0.0.1]: https://github.com/your-org/headscale-setup/releases/tag/v0.0.1
+[Unreleased]: https://github.com/eslam-adel92/headscale-setup/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/eslam-adel92/headscale-setup/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/eslam-adel92/headscale-setup/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/eslam-adel92/headscale-setup/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/eslam-adel92/headscale-setup/compare/v0.0.3...v0.1.0
+[0.0.3]: https://github.com/eslam-adel92/headscale-setup/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/eslam-adel92/headscale-setup/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/eslam-adel92/headscale-setup/releases/tag/v0.0.1

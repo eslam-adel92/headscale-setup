@@ -2,8 +2,8 @@
 # One Makefile to rule them all. Override on the CLI:
 #   make push IMAGE=ghcr.io/my-org/headscale VERSION=0.29.1
 ###############################################################################
-IMAGE       ?= ghcr.io/your-org/headscale
-UI_IMAGE    ?= ghcr.io/your-org/headscale-ui
+IMAGE       ?= ghcr.io/eslam-adel92/headscale
+UI_IMAGE    ?= ghcr.io/eslam-adel92/headscale-ui
 VERSION     ?= 0.29.1
 UI_VERSION  ?= 2026-03-17
 PLATFORMS   ?= linux/amd64,linux/arm64
