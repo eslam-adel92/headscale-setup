@@ -22,9 +22,9 @@ on:
   workflow_dispatch:
     inputs:
       headscale_version:
-        description: "Headscale upstream version (e.g. 0.29.1)"
+        description: "Headscale upstream version (e.g. 0.29.2)"
         required: true
-        default: "0.29.1"
+        default: "0.29.2"
       headscale_ui_version:
         description: "Headscale-UI upstream version (e.g. 2026.03.17)"
         required: true
@@ -61,7 +61,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
-  DEFAULT_HEADSCALE_VERSION: "0.29.1"
+  DEFAULT_HEADSCALE_VERSION: "0.29.2"
   DEFAULT_HEADSCALE_UI_VERSION: "2026.03.17"
 
 jobs:

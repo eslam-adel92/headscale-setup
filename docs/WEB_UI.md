@@ -63,7 +63,7 @@ headscale apikeys create --expiration 90d
 Headscale-ui pins to specific headscale minor versions — check the compatibility matrix in the upstream README before upgrading either component.
 
 Current alignment in this chart:
-- headscale `0.29.1`
+- headscale `0.29.2`
 - headscale-ui `2026.03.17`
 
 ## Custom images vs. upstream

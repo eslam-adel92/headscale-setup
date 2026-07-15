@@ -123,7 +123,7 @@ timezone (`UTC`), DB name/user (`headscale`), Vault path (`apps/headscale/postgr
 
 ```bash
 # 1. Build both images (or pull from GHCR once CI has run)
-docker buildx build -t ghcr.io/eslam-adel92/headscale:0.29.1        docker/
+docker buildx build -t ghcr.io/eslam-adel92/headscale:0.29.2        docker/
 docker buildx build -t ghcr.io/eslam-adel92/headscale-ui:2026.03.17 docker/ui/
 
 # 2. Configure
@@ -195,7 +195,7 @@ push to `main` touching `docker/**`, and tag `v*.*.*` (semver-tagged release).
 **Auth**: uses the built-in `GITHUB_TOKEN` — no PAT needed. Least-privilege scoping via the workflow's `permissions:` block (`packages: write`, `security-events: write`, `id-token: write`).
 
 Images land at:
-- `ghcr.io/<eslam-adel92>/headscale:0.29.1` (+ `latest`, `sha-abcdef1`, semver tags on git tags)
+- `ghcr.io/<eslam-adel92>/headscale:0.29.2` (+ `latest`, `sha-abcdef1`, semver tags on git tags)
 - `ghcr.io/<eslam-adel92>/headscale-ui:2026.03.17` (same tag policy)
 
 ---

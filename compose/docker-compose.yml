@@ -79,7 +79,7 @@ services:
     networks: [headscale-net]
 
   headscale:
-    image: ${HEADSCALE_IMAGE:-ghcr.io/eslam-adel92/headscale:0.29.1}
+    image: ${HEADSCALE_IMAGE:-ghcr.io/eslam-adel92/headscale:0.29.2}
     restart: *restart
     container_name: headscale
     depends_on:

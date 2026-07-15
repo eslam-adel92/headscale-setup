@@ -6,7 +6,7 @@ description: |
   headscale-ui with optional Basic Auth ingress.
 type: application
 version: 0.4.0
-appVersion: "0.29.1"
+appVersion: "0.29.2"
 kubeVersion: ">=1.27.0-0"
 home: https://headscale.net
 sources:
