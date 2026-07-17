@@ -2,8 +2,8 @@
 // Adjust user names to match your headscale users.
 {
   "groups": {
-    "group:admins":  ["admin"],
-    "group:users":   ["alice", "bob"]
+    "group:admins":  ["admin@"],
+    "group:users":   ["eslam@"]
   },
   "tagOwners": {
     "tag:server":  ["group:admins"],

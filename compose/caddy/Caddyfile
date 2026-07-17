@@ -10,7 +10,7 @@
     email {$ACME_EMAIL}
 }
 
-{$HEADSCALE_DOMAIN} {
+{$HEADSCALE_URL_SCHEME:https}://{$HEADSCALE_DOMAIN} {
     encode zstd gzip
 
     header {
@@ -30,7 +30,7 @@
             header_up Host              {host}
             header_up X-Real-IP         {remote}
             header_up X-Forwarded-For   {remote}
-            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Proto {$HEADSCALE_URL_SCHEME:https}
         }
     }
 }

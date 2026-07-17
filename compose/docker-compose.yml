@@ -27,10 +27,10 @@ x-security-postgres: &security-postgres
     - no-new-privileges:true
   cap_drop: [ALL]
   cap_add:
-    - CHOWN            # chown PGDATA to postgres:postgres
-    - FOWNER           # relax perms on files postgres already owns
-    - DAC_OVERRIDE     # write into dirs the entrypoint doesn't own yet
-    - SETGID           # su-exec / gosu drops root → postgres
+    - CHOWN # chown PGDATA to postgres:postgres
+    - FOWNER # relax perms on files postgres already owns
+    - DAC_OVERRIDE # write into dirs the entrypoint doesn't own yet
+    - SETGID # su-exec / gosu drops root → postgres
     - SETUID
 
 services:
@@ -59,7 +59,11 @@ services:
       - hba_file=/etc/postgresql/pg_hba.conf
     expose: ["5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-headscale} -d ${POSTGRES_DB:-headscale}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-headscale} -d ${POSTGRES_DB:-headscale}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -67,8 +71,16 @@ services:
     networks: [headscale-net]
     deploy:
       resources:
-        limits:       { cpus: "${POSTGRES_CPU_LIMIT:-2.0}",  memory: "${POSTGRES_MEM_LIMIT:-1G}" }
-        reservations: { cpus: "${POSTGRES_CPU_REQ:-0.25}",   memory: "${POSTGRES_MEM_REQ:-256M}" }
+        limits:
+          {
+            cpus: "${POSTGRES_CPU_LIMIT:-2.0}",
+            memory: "${POSTGRES_MEM_LIMIT:-1G}",
+          }
+        reservations:
+          {
+            cpus: "${POSTGRES_CPU_REQ:-0.25}",
+            memory: "${POSTGRES_MEM_REQ:-256M}",
+          }
 
   postgres-backup:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
@@ -111,17 +123,18 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
+      - /var/run:size=16m,mode=1777
     <<: *security-strict
     user: "65532:65532"
     environment:
       - TZ=${TZ:-UTC}
-      - HEADSCALE_SERVER_URL=https://${HEADSCALE_DOMAIN}
+      - HEADSCALE_SERVER_URL=${HEADSCALE_URL_SCHEME:-https}://${HEADSCALE_DOMAIN}
       - HEADSCALE_DATABASE_TYPE=postgres
       - HEADSCALE_DATABASE_POSTGRES_HOST=postgres
       - HEADSCALE_DATABASE_POSTGRES_PORT=5432
       - HEADSCALE_DATABASE_POSTGRES_NAME=${POSTGRES_DB:-headscale}
       - HEADSCALE_DATABASE_POSTGRES_USER=${POSTGRES_USER:-headscale}
-      - HEADSCALE_DATABASE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - HEADSCALE_DATABASE_POSTGRES_PASS=${POSTGRES_PASSWORD}
       - HEADSCALE_DATABASE_POSTGRES_SSL=disable
     volumes:
       - headscale-data:/var/lib/headscale
@@ -170,6 +183,7 @@ services:
       - ACME_EMAIL=${ACME_EMAIL}
       - UI_BASIC_AUTH_USER=${UI_BASIC_AUTH_USER:-admin}
       - UI_BASIC_AUTH_HASH=${UI_BASIC_AUTH_HASH:-}
+      - HEADSCALE_URL_SCHEME=${HEADSCALE_URL_SCHEME:-https}
     volumes:
       # Both variants mounted; the entrypoint below picks the right one.
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro,z
