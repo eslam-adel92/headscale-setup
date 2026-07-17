@@ -21,7 +21,8 @@
         -Server
     }
 
-    handle /web* {
+    redir /web /web/
+    handle /web/* {
         reverse_proxy headscale-ui:8080
     }
 

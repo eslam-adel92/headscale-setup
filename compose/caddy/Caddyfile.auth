@@ -16,7 +16,8 @@
         -Server
     }
 
-    handle /web* {
+    redir /web /web/
+    handle /web/* {
         basic_auth {
             {$UI_BASIC_AUTH_USER} {$UI_BASIC_AUTH_HASH}
         }
