@@ -60,7 +60,21 @@ if ! run_hs users list --output json | grep -q "\"name\":\"${USER}\""; then
   run_hs users create "$USER" >/dev/null
 fi
 
-FLAGS=(--user "$USER" --expiration "$TTL")
+# Headscale >= 0.23 requires numeric User ID for preauthkeys create
+if command -v jq >/dev/null 2>&1; then
+  USER_ID=$(run_hs users list --output json | jq -r ".[] | select(.name == \"$USER\") | .id")
+elif command -v python3 >/dev/null 2>&1; then
+  USER_ID=$(run_hs users list --output json | python3 -c "import sys, json; data = json.load(sys.stdin); print(next((str(u['id']) for u in data if u['name'] == '$USER'), ''))")
+else
+  USER_ID=$(run_hs users list | grep -E "\b${USER}\b" | awk '{print $1}' | grep -E '^[0-9]+$' | head -n 1)
+fi
+
+if [[ -z "$USER_ID" || ! "$USER_ID" =~ ^[0-9]+$ ]]; then
+  echo "❌ Could not determine numeric ID for user $USER. Ensure jq or python3 is installed." >&2
+  exit 1
+fi
+
+FLAGS=(--user "$USER_ID" --expiration "$TTL")
 [[ "$REUSABLE"  == "true" ]] && FLAGS+=(--reusable)
 [[ "$EPHEMERAL" == "true" ]] && FLAGS+=(--ephemeral)
 [[ -n "$TAGS" ]]              && FLAGS+=(--tags "$TAGS")
