@@ -29,14 +29,28 @@ run_hs() {
     kubectl exec -n "${HS_KUBE_NS:-headscale}" "$POD" -- headscale "$@"
   elif docker compose ps headscale --quiet >/dev/null 2>&1; then
     docker compose exec -T headscale headscale "$@"
+  elif [[ -f compose/docker-compose.yml ]] && docker compose -f compose/docker-compose.yml ps headscale --quiet >/dev/null 2>&1; then
+    docker compose -f compose/docker-compose.yml exec -T headscale headscale "$@"
+  elif [[ -f ../compose/docker-compose.yml ]] && docker compose -f ../compose/docker-compose.yml ps headscale --quiet >/dev/null 2>&1; then
+    docker compose -f ../compose/docker-compose.yml exec -T headscale headscale "$@"
   else
     echo "❌ Could not detect a running headscale (binary / compose / k8s)." >&2
     exit 1
   fi
 }
 
-SERVER_URL="${HEADSCALE_DOMAIN:+https://$HEADSCALE_DOMAIN}"
-if [[ -z "$SERVER_URL" ]]; then
+# Source .env automatically if it exists to get HEADSCALE_DOMAIN and SCHEME
+for env_file in ".env" "compose/.env" "../compose/.env"; do
+  if [[ -f "$env_file" ]]; then
+    set -a; source "$env_file"; set +a
+    break
+  fi
+done
+
+SCHEME="${HEADSCALE_URL_SCHEME:-https}"
+if [[ -n "${HEADSCALE_DOMAIN:-}" ]]; then
+  SERVER_URL="${SCHEME}://${HEADSCALE_DOMAIN}"
+else
   SERVER_URL=$(run_hs configtest 2>/dev/null | awk -F': ' '/server_url/ {print $2; exit}' || true)
 fi
 : "${SERVER_URL:?Set HEADSCALE_DOMAIN or configure server_url}"
