@@ -42,7 +42,10 @@ run_hs() {
 # Source .env automatically if it exists to get HEADSCALE_DOMAIN and SCHEME
 for env_file in ".env" "compose/.env" "../compose/.env"; do
   if [[ -f "$env_file" ]]; then
-    set -a; source "$env_file"; set +a
+    set -a
+    # shellcheck source=/dev/null
+    source "$env_file"
+    set +a
     break
   fi
 done
