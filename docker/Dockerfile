@@ -26,8 +26,18 @@ WORKDIR /src
 RUN git clone --depth 1 --branch v${HEADSCALE_VERSION} \
     https://github.com/juanfont/headscale.git .
 
-ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    GOFLAGS="-trimpath -mod=readonly"
+ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
+
+# Bump grpc-go past a HIGH CVE (GHSA-hrxh-6v49-42gf, fixed 1.82.1) not yet
+# picked up by upstream headscale's go.mod at this tag. This intentionally
+# leaves the tree modified, so `headscale version` reports a "+dirty" suffix
+# — expected and accurate: this build differs from a stock v${HEADSCALE_VERSION} checkout.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go get google.golang.org/grpc@v1.82.1 && \
+    go mod tidy
+
+ENV GOFLAGS="-trimpath -mod=readonly"
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
