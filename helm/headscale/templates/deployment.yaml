@@ -35,7 +35,7 @@ spec:
       {{- if eq .Values.database.type "postgres" }}
       initContainers:
         - name: wait-for-postgres
-          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          image: "{{ include "headscale.imageRef" .Values.postgresql.image }}"
           command:
             - /bin/sh
             - -c
@@ -58,7 +58,7 @@ spec:
       {{- end }}
       containers:
         - name: headscale
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ include "headscale.imageRef" .Values.image }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["serve"]
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}

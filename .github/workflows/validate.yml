@@ -1,0 +1,92 @@
+###############################################################################
+# Fast, no-cluster-needed validation for everything that isn't a container
+# image: the Helm chart, the Compose stack, and the onboarding scripts.
+#
+# Kept separate from build-image.yml (which builds/scans/pushes the two
+# images) so a broken chart edit fails fast without waiting on image builds,
+# and a broken Dockerfile doesn't block chart-only PRs.
+###############################################################################
+
+name: validate
+
+on:
+  pull_request:
+    paths:
+      - "helm/**"
+      - "compose/**"
+      - "scripts/**"
+      - ".github/workflows/validate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "helm/**"
+      - "compose/**"
+      - "scripts/**"
+      - ".github/workflows/validate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm-validate:
+    name: Helm lint + template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: helm lint
+        run: helm lint helm/headscale
+
+      - name: helm template (render sanity check)
+        run: |
+          helm template headscale helm/headscale \
+            -f helm/headscale/values.yaml > /dev/null
+
+      - name: helm template with optional features enabled
+        run: |
+          helm template headscale helm/headscale \
+            -f helm/headscale/values.yaml \
+            --set vault.enabled=true \
+            --set ui.basicAuth.enabled=true \
+            --set-string ui.basicAuth.password=throwaway \
+            --set postgresql.external.enabled=true \
+            --set postgresql.enabled=false \
+            --set-string postgresql.external.existingSecret=throwaway \
+            > /dev/null
+
+  compose-validate:
+    name: Compose config render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render compose config
+        run: |
+          cp compose/.env.example compose/.env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=validate-only-placeholder/' compose/.env
+          docker compose -f compose/docker-compose.yml config > /dev/null
+
+  shell-validate:
+    name: Shell syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n scripts
+        run: |
+          bash -n scripts/hs-add-device
+          bash -n scripts/hs-hash-ui-password
+
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "./scripts"
+          severity: warning

@@ -11,7 +11,7 @@ PLATFORMS   ?= linux/amd64,linux/arm64
 .PHONY: help build build-ui push push-ui scan scan-ui \
         compose-up compose-down compose-backup \
         helm-lint helm-template helm-install helm-uninstall add-device \
-        pg-shell pg-backup pg-restore hash-ui-password
+        pg-shell pg-backup pg-restore hash-ui-password pin-digests
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -30,6 +30,12 @@ scan: ## Trivy scan headscale
 	trivy image --severity HIGH,CRITICAL --ignore-unfixed $(IMAGE):$(VERSION)
 scan-ui: ## Trivy scan headscale-ui
 	trivy image --severity HIGH,CRITICAL --ignore-unfixed $(UI_IMAGE):$(UI_VERSION)
+
+pin-digests: ## Resolve current digests for the configured image refs (for values-*.yaml image.digest)
+	@echo "# Paste the matching digest into image.digest / ui.image.digest / postgresql.image.digest"
+	@echo "$(IMAGE):$(VERSION)  ->" $$(docker buildx imagetools inspect $(IMAGE):$(VERSION) --format '{{json .Manifest}}' | grep -o 'sha256:[a-f0-9]*' | head -1)
+	@echo "$(UI_IMAGE):$(UI_VERSION)  ->" $$(docker buildx imagetools inspect $(UI_IMAGE):$(UI_VERSION) --format '{{json .Manifest}}' | grep -o 'sha256:[a-f0-9]*' | head -1)
+	@echo "postgres:16-alpine  ->" $$(docker buildx imagetools inspect postgres:16-alpine --format '{{json .Manifest}}' | grep -o 'sha256:[a-f0-9]*' | head -1)
 
 compose-up:     ## Bring up the compose stack
 	cd compose && docker compose up -d

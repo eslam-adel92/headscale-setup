@@ -1,5 +1,8 @@
 # Security Posture
 
+> To report a vulnerability in this repo's tooling, see [`SECURITY.md`](../SECURITY.md)
+> at the repo root. This document is the threat model and control mapping.
+
 ## Threat model (in scope)
 
 1. Compromised container image (supply-chain attack).
@@ -13,7 +16,7 @@
 
 | Threat | Control |
 |---|---|
-| Supply chain | Both images built from source at pinned tags. `-trimpath` (Go), `npm ci --ignore-scripts` (UI). Trivy CI gate on both. |
+| Supply chain | Both images built from source at pinned tags. `-trimpath` (Go), `npm ci --ignore-scripts` (UI). Trivy CI gate on both. Optionally pin by digest (`image.digest` / `ui.image.digest` / `postgresql.image.digest` in `values.yaml`, resolved via `make pin-digests`) for immutable, tag-mutation-proof deploys. |
 | Post-exploit lateral (API) | Distroless base — no shell / package manager / libc. |
 | Post-exploit lateral (UI) | nginx-unprivileged (UID 101), read-only rootfs, capabilities dropped, tmpfs for writable paths. |
 | Container escape | `runAsNonRoot`, `readOnlyRootFilesystem`, `capDrop: ALL`, `seccompProfile: RuntimeDefault`. |

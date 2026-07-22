@@ -33,7 +33,7 @@ spec:
       {{- end }}
       containers:
         - name: headscale-ui
-          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+          image: "{{ include "headscale.imageRef" .Values.ui.image }}"
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

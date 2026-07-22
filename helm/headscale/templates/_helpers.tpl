@@ -86,6 +86,16 @@ app.kubernetes.io/component: database
 {{- end -}}
 {{- end -}}
 
+{{- define "headscale.imageRef" -}}
+{{- if .digest -}}
+{{- $digest := .digest -}}
+{{- if not (hasPrefix "sha256:" $digest) -}}{{- $digest = printf "sha256:%s" $digest -}}{{- end -}}
+{{- printf "%s:%s@%s" .repository .tag $digest -}}
+{{- else -}}
+{{- printf "%s:%s" .repository .tag -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "headscale.netpol.ingressControllerFrom" -}}
 {{- if .Values.networkPolicy.ingressController.namespace -}}
 - namespaceSelector:

@@ -7,6 +7,10 @@
 image:
   repository: ghcr.io/eslam-adel92/headscale
   tag: "0.29.2"
+  # Optional: pin by digest (with or without the "sha256:" prefix) for
+  # supply-chain-hardened deploys. Resolve current digests with
+  # `make pin-digests`. Leave empty to deploy by tag (default).
+  digest: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
 
@@ -27,6 +31,7 @@ postgresql:
   image:
     repository: postgres
     tag: "16-alpine"
+    digest: "" # optional, see image.digest above
     pullPolicy: IfNotPresent
 
   auth:
@@ -105,6 +110,7 @@ ui:
   image:
     repository: ghcr.io/eslam-adel92/headscale-ui
     tag: "2026.03.17"
+    digest: "" # optional, see image.digest above
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:

@@ -1,5 +1,11 @@
 # 🦭 headscale-setup
 
+[![build-image](https://github.com/eslam-adel92/headscale-setup/actions/workflows/build-image.yml/badge.svg)](https://github.com/eslam-adel92/headscale-setup/actions/workflows/build-image.yml)
+[![validate](https://github.com/eslam-adel92/headscale-setup/actions/workflows/validate.yml/badge.svg)](https://github.com/eslam-adel92/headscale-setup/actions/workflows/validate.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![Helm](https://img.shields.io/badge/Helm-%E2%89%A53.14-0F1689)](helm/headscale)
+[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED)](compose/docker-compose.yml)
+
 > Production-grade, security-hardened, self-hosted **Tailscale coordination
 > server** with an optional web UI (Basic-Auth-protected), PostgreSQL,
 > optional Vault integration, Trivy-gated CI, and one-command device onboarding.
@@ -10,6 +16,7 @@ organisation — swap `eslam-adel92` in a couple of places and go.
 
 ## Table of contents
 
+- [Requirements](#-requirements)
 - [Deployment modes](#-deployment-modes)
 - [What's inside](#-whats-inside)
 - [What to change before first run](#-what-to-change-before-first-run)
@@ -19,7 +26,27 @@ organisation — swap `eslam-adel92` in a couple of places and go.
 - [Feature matrix](#-feature-matrix)
 - [Design decisions](#-design-decisions)
 - [Common ops](#-common-ops)
+- [Troubleshooting](#-troubleshooting)
 - [Further reading](#-further-reading)
+- [Contributing](#-contributing)
+
+---
+
+## 📋 Requirements
+
+| Tool | Needed for | Minimum version |
+|---|---|---|
+| Docker Engine + Compose plugin | Compose mode | Compose v2 (`docker compose`, not `docker-compose`) — `profiles:` support |
+| Docker Buildx | Building images locally | Bundled with recent Docker Desktop/Engine |
+| Helm | Helm mode | ≥ 3.14 |
+| `kubectl` | Helm mode | Matching your cluster's minor version |
+| A Kubernetes cluster | Helm mode | ≥ 1.27 (see `kubeVersion` in `Chart.yaml`) |
+| `jq` (optional) | `scripts/hs-add-device` — robust JSON parsing | any recent version |
+| `qrencode` (optional) | `scripts/hs-add-device` — inline QR code | any recent version |
+| `trivy` (optional) | `make scan` / `make scan-ui` locally | any recent version |
+
+Cluster-specific prerequisites (cert-manager, ingress-nginx, a UDP-capable
+LoadBalancer, VSO) are listed in [Quickstart — Kubernetes](#-quickstart--kubernetes-helm).
 
 ---
 
@@ -37,8 +64,12 @@ organisation — swap `eslam-adel92` in a couple of places and go.
 
 ```
 headscale-setup/
-├── .github/workflows/build-image.yml    ← Matrix Trivy-gated build → GHCR
-│                                          (headscale + headscale-ui)
+├── .github/
+│   ├── workflows/build-image.yml        ← Matrix Trivy-gated build → GHCR
+│   │                                       (headscale + headscale-ui)
+│   ├── workflows/validate.yml           ← helm lint/template, compose config, shellcheck
+│   ├── ISSUE_TEMPLATE/                  ← Bug report / feature request
+│   └── PULL_REQUEST_TEMPLATE.md
 ├── docker/
 │   ├── Dockerfile                       ← headscale — distroless/static:nonroot (~28 MB)
 │   └── ui/
@@ -70,6 +101,7 @@ headscale-setup/
 │       ├── ui-basic-auth-secret.yaml    ←   Chart-generated bcrypt htpasswd Secret
 │       ├── vault-secret.yaml            ←   VaultStaticSecret (VSO)
 │       ├── configmap.yaml               ←   headscale config + ACL policy
+│       ├── tests/test-connection.yaml   ←   `helm test` hook, hits /health
 │       └── NOTES.txt
 ├── scripts/
 │   ├── hs-add-device                    ← 🌟 auto-detects compose/k8s, prints
@@ -86,6 +118,9 @@ headscale-setup/
 │   └── UI_BASIC_AUTH.md
 ├── Makefile                             ← all the make targets you'll want
 ├── CHANGELOG.md                         ← what changed release-to-release
+├── LICENSE                              ← BSD-3-Clause
+├── SECURITY.md                          ← how to report a vulnerability
+├── CONTRIBUTING.md                      ← how to propose changes
 ├── .gitignore
 └── README.md                            ← you are here
 ```
@@ -116,6 +151,13 @@ grep -rl "admin@example.com" . | xargs sed -i 's/admin@example.com/ops@yourdomai
 Every other setting — DERP region name, ACL user names (`admin`, `alice`, `bob`),
 timezone (`UTC`), DB name/user (`headscale`), Vault path (`apps/headscale/postgres`)
 — is a safely generic default you can leave alone or override per environment.
+
+**Optional — pin images by digest.** `values.yaml` has an empty
+`image.digest` / `ui.image.digest` / `postgresql.image.digest` next to each
+`tag:`. Run `make pin-digests` to resolve the current digest for each
+configured ref, then set it (via `values-{env}.yaml` or `--set-string`) for
+immutable, tag-mutation-proof deploys. Leave empty to deploy by tag (default,
+unchanged behavior).
 
 ---
 
@@ -270,6 +312,23 @@ Run `make help` for the full list.
 
 ---
 
+## 🛠 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Caddy stuck / cert never issues (Compose) | ACME HTTP-01 challenge can't reach you — DNS for `HEADSCALE_DOMAIN` not pointing at this host yet, or port 80 blocked/NAT'd | `dig +short $HEADSCALE_DOMAIN` and confirm it resolves publicly to this box; open port 80 (not just 443) to the internet during issuance |
+| `postgres` container unhealthy / headscale restarts in a loop (Compose) | First boot is slow to `pg_isready` (initdb + WAL setup), or `POSTGRES_PASSWORD` unset | `docker compose logs postgres`; confirm `.env` has `POSTGRES_PASSWORD` set — it's a hard requirement (`:?` in the compose file) |
+| `wait-for-postgres` init container never completes (Helm) | Bundled Postgres StatefulSet pod not Ready yet, or `postgresql.external.*` misconfigured while `postgresql.enabled` is also true | `kubectl -n headscale logs deploy/headscale -c wait-for-postgres`; check `kubectl -n headscale get pods -l app.kubernetes.io/name=postgresql`; make sure exactly one of `postgresql.enabled` / `postgresql.external.enabled` is `true` |
+| Browser gets a 401 on `/web` right after enabling Basic Auth | Stale ingress/Caddy config, or credentials rotated but not reloaded | Helm: confirm `checksum/ui-auth` annotation changed and the UI ingress/pod rolled; Compose: `docker compose restart caddy` after regenerating `UI_BASIC_AUTH_HASH` |
+| `hs-add-device` exits with "Could not detect a running headscale" | None of binary/K8s pod/Compose service was found from the auto-detection order | Set `HS_BIN`, or run from the repo root / `compose/` so the fallback paths resolve; see `scripts/hs-add-device`'s detection order in `CLAUDE.md` |
+| `hs-add-device` exits with "Could not determine numeric ID" | Neither `jq` nor `python3` is installed | Install `jq` (recommended) — see [Requirements](#-requirements) |
+
+For anything not listed here, check the relevant doc in
+[Further reading](#-further-reading) — most failure modes are covered by the
+threat model, scaling ceilings, or DB tuning docs.
+
+---
+
 ## 📚 Further reading
 
 | Doc | What it covers |
@@ -282,6 +341,8 @@ Run `make help` for the full list.
 | [`docs/WEB_UI.md`](docs/WEB_UI.md) | UI overview, API-key first sign-in, custom vs. upstream image |
 | [`docs/UI_BASIC_AUTH.md`](docs/UI_BASIC_AUTH.md) | Basic Auth walkthrough (Compose + Helm), rotation, multi-user |
 | [`clients/AGENT_INSTALL.md`](clients/AGENT_INSTALL.md) | Fedora / Ubuntu / Arch / macOS / Windows / iOS / Android |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability in this repo's tooling |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to propose changes, what to validate before opening a PR |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed release-to-release |
 
 Upstream projects:
@@ -290,6 +351,16 @@ Upstream projects:
 
 ---
 
+## 🤝 Contributing
+
+This is deployment tooling around upstream headscale/headscale-ui, not an
+app with its own test suite — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for
+what to run (`helm lint`, `helm template`, `docker compose config`, `bash -n`)
+before opening a PR, and [`SECURITY.md`](SECURITY.md) if you're reporting a
+vulnerability rather than a bug.
+
+---
+
 ## 📄 License
 
-BSD-3-Clause (matches both upstream projects).
+[BSD-3-Clause](LICENSE) (matches both upstream projects).

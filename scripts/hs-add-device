@@ -79,7 +79,19 @@ FLAGS=(--user "$USER_ID" --expiration "$TTL")
 [[ "$EPHEMERAL" == "true" ]] && FLAGS+=(--ephemeral)
 [[ -n "$TAGS" ]]              && FLAGS+=(--tags "$TAGS")
 
-KEY=$(run_hs preauthkeys create "${FLAGS[@]}" --output json | sed -E 's/.*"key":"([^"]+)".*/\1/')
+PREAUTH_JSON=$(run_hs preauthkeys create "${FLAGS[@]}" --output json)
+if command -v jq >/dev/null 2>&1; then
+  KEY=$(jq -r '.key' <<<"$PREAUTH_JSON")
+elif command -v python3 >/dev/null 2>&1; then
+  KEY=$(python3 -c "import sys, json; print(json.load(sys.stdin)['key'])" <<<"$PREAUTH_JSON")
+else
+  KEY=$(sed -E 's/.*"key":"([^"]+)".*/\1/' <<<"$PREAUTH_JSON")
+fi
+
+if [[ -z "$KEY" || "$KEY" == "null" ]]; then
+  echo "❌ Could not parse pre-auth key from headscale output." >&2
+  exit 1
+fi
 
 CMD="tailscale up --login-server ${SERVER_URL} --authkey ${KEY}"
 IOS_URL="tailscale://login-server=${SERVER_URL}&authkey=${KEY}"
